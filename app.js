@@ -1,3 +1,27 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAfVXKcgdolFMNmUovnHa93dHwnKAHnDDc",
+  authDomain: "oscar-rtv-app-a1c48.firebaseapp.com",
+  projectId: "oscar-rtv-app-a1c48",
+  storageBucket: "oscar-rtv-app-a1c48.firebasestorage.app",
+  messagingSenderId: "320799648470",
+  appId: "1:320799648470:web:5eb567c201653c528cc5c7",
+  measurementId: "G-X77043G1JV"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 const mainContent = document.getElementById("main-content");
 const menuItems = document.querySelectorAll(".menu li");
 
@@ -129,24 +153,16 @@ function getSectionContent(section) {
         </div>
 
         <div class="card">
-          <h2>Live Chat</h2>
-          <p>Suivez les messages en direct pendant la diffusion.</p>
+          <h2>Live Chat Firebase</h2>
+          <p>Écrivez un message pendant le direct.</p>
 
-          <iframe
-            class="chat-frame"
-            src="https://www.youtube.com/live_chat?v=7Emqt-xtBIM&embed_domain=127.0.0.1"
-            title="Oscar RTV Live Chat"
-            frameborder="0">
-          </iframe>
+          <div id="chat-box" class="chat-box"></div>
 
-          <div class="tv-button-wrap">
-            <a
-              href="https://www.youtube.com/live_chat?v=7Emqt-xtBIM"
-              target="_blank"
-              class="youtube-btn">
-              💬 Open Live Chat on YouTube
-            </a>
-          </div>
+          <form id="chat-form" class="chat-form">
+            <input id="chat-name" type="text" placeholder="Votre nom" value="User" required />
+            <input id="chat-input" type="text" placeholder="Écrire un message..." required />
+            <button type="submit" class="action-btn">Envoyer</button>
+          </form>
         </div>
       `;
 
@@ -263,28 +279,6 @@ function getSectionContent(section) {
             et valorise la culture haïtienne, tant sur le territoire qu’au sein de la diaspora.
           </p>
         </div>
-
-        <div class="card">
-          <h2>Valeurs</h2>
-          <div class="grid">
-            <div class="item-box">
-              <h3>Intégrité</h3>
-              <p>Transmettre une information juste, équilibrée et responsable.</p>
-            </div>
-            <div class="item-box">
-              <h3>Respect</h3>
-              <p>Chaque voix compte, chaque histoire mérite d’être écoutée.</p>
-            </div>
-            <div class="item-box">
-              <h3>Passion</h3>
-              <p>La parole, le son et l’expression artistique peuvent changer les mentalités.</p>
-            </div>
-            <div class="item-box">
-              <h3>Innovation</h3>
-              <p>Rendre les médias accessibles, dynamiques et inspirants.</p>
-            </div>
-          </div>
-        </div>
       `;
 
     case "contact":
@@ -311,16 +305,6 @@ function getSectionContent(section) {
             <div class="list-item">
               <h3>Facebook</h3>
               <p><a href="https://www.facebook.com/share/1ASrvYfXzq/?mibextid=wwXIfr" target="_blank">Oscar RTV Facebook</a></p>
-            </div>
-
-            <div class="list-item">
-              <h3>Téléphone</h3>
-              <p>Ajoutez ici le numéro officiel</p>
-            </div>
-
-            <div class="list-item">
-              <h3>Email</h3>
-              <p>Ajoutez ici l’email officiel</p>
             </div>
           </div>
         </div>
@@ -399,17 +383,73 @@ function showSection(section, clickedItem) {
       menuItem.classList.add("active");
     }
   }
+
+  if (section === "tv") {
+    initChat();
+  }
 }
 
-function goToSection(section) {
+window.goToSection = function (section) {
   showSection(section, null);
-}
+};
 
-function playRadio() {
+window.playRadio = function () {
   const player = document.getElementById("radioPlayer");
   if (player) {
     player.play();
   }
+};
+
+let chatInitialized = false;
+
+function initChat() {
+  const chatBox = document.getElementById("chat-box");
+  const form = document.getElementById("chat-form");
+  const nameInput = document.getElementById("chat-name");
+  const input = document.getElementById("chat-input");
+
+  if (!chatBox || !form || !nameInput || !input) return;
+
+  const q = query(collection(db, "chat"), orderBy("time"));
+
+  if (!chatInitialized) {
+    onSnapshot(q, (snapshot) => {
+      chatBox.innerHTML = "";
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const row = document.createElement("div");
+        row.className = "chat-message";
+
+        const user = data.NAME || data.name || "User";
+        const message = data.MESSAGE || data.message || "";
+
+        row.innerHTML = `<strong>${user}</strong>: ${message}`;
+        chatBox.appendChild(row);
+      });
+
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    chatInitialized = true;
+  }
+
+  form.onsubmit = async function (e) {
+    e.preventDefault();
+
+    const userName = nameInput.value.trim() || "User";
+    const message = input.value.trim();
+
+    if (!message) return;
+
+    await addDoc(collection(db, "chat"), {
+      NAME: userName,
+      MESSAGE: message,
+      time: serverTimestamp()
+    });
+
+    input.value = "";
+  };
 }
 
 menuItems.forEach(function (item) {
